@@ -1,0 +1,325 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Calculadora de Numeración Maya</title>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+  font-family: system-ui, sans-serif;
+  color: #1a1a1a;
+  background: #f5f5f3;
+  padding: 2rem 1rem;
+}
+h1 { font-size: 20px; font-weight: 500; margin-bottom: 1.5rem; }
+.app { max-width: 700px; margin: 0 auto; }
+.top-bar { display: flex; gap: 8px; align-items: center; margin-bottom: 1.5rem; flex-wrap: wrap; }
+.top-bar input {
+  flex: 1; min-width: 140px; max-width: 200px;
+  padding: 6px 10px; font-size: 14px;
+  border: 0.5px solid #bbb; border-radius: 8px;
+  background: #fff; outline: none;
+}
+.top-bar input:focus { border-color: #888; }
+button {
+  padding: 6px 14px; font-size: 13px; cursor: pointer;
+  border: 0.5px solid #bbb; border-radius: 8px;
+  background: #fff; color: #1a1a1a;
+  transition: background 0.15s;
+}
+button:hover { background: #f0f0ee; }
+button:active { transform: scale(0.98); }
+.result-bar {
+  display: flex; gap: 16px; align-items: baseline; flex-wrap: wrap;
+  margin-bottom: 1.5rem; padding: 12px 16px;
+  background: #eeecea; border-radius: 8px;
+}
+.result-decimal { font-size: 22px; font-weight: 500; }
+.result-decomp { font-size: 13px; color: #666; }
+.levels { display: flex; flex-direction: column-reverse; gap: 12px; }
+.level {
+  background: #fff; border: 0.5px solid #ddd;
+  border-radius: 12px; padding: 12px 16px;
+}
+.level-header {
+  display: flex; align-items: center;
+  justify-content: space-between; margin-bottom: 10px;
+}
+.level-label { font-size: 13px; color: #666; }
+.level-value { font-size: 13px; font-weight: 500; }
+.level-controls { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 10px; }
+.level-controls button { font-size: 12px; padding: 4px 10px; }
+.level-display { display: flex; align-items: center; gap: 16px; }
+canvas.digit { display: block; }
+.digit-info { font-size: 12px; color: #888; }
+.del-level-btn { font-size: 11px; padding: 2px 8px; color: #888; }
+.level-mgmt-bar { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 1rem; }
+.decimals-hidden .digit-info { visibility: hidden; }
+.decimals-hidden #resDecimal { visibility: hidden; }
+.decimals-hidden #resDecomp { visibility: hidden; }
+.decimals-hidden .level-value { visibility: hidden; }
+footer { margin-top: 2rem; font-size: 12px; color: #aaa; text-align: center; }
+
+@media (prefers-color-scheme: dark) {
+  body { background: #1e1e1c; color: #e5e5e3; }
+  button { background: #2c2c2a; border-color: #444; color: #e5e5e3; }
+  button:hover { background: #3a3a38; }
+  .top-bar input { background: #2c2c2a; border-color: #444; color: #e5e5e3; }
+  .result-bar { background: #2a2a28; }
+  .result-decomp { color: #aaa; }
+  .level { background: #252523; border-color: #3a3a38; }
+  .level-label { color: #aaa; }
+  .digit-info { color: #888; }
+}
+</style>
+</head>
+<body>
+<div class="app">
+  <h1>Calculadora de Numeración Maya</h1>
+
+  <div class="top-bar">
+    <input type="number" id="decInput" placeholder="Escribe un decimal..." min="0" max="159999" />
+    <button onclick="decToMaya()">Convertir a maya ↓</button>
+    <button onclick="clearAll()">Limpiar</button>
+  </div>
+
+  <div class="result-bar" id="resultBar">
+    <span class="result-decimal" id="resDecimal">0</span>
+    <span class="result-decomp" id="resDecomp"></span>
+  </div>
+
+  <div class="level-mgmt-bar">
+    <button id="addLevelBtn" onclick="addLevel()" style="display:none">+ agregar nivel</button>
+    <button id="delLevelBtn" onclick="removeTopLevel()" style="display:none">− quitar nivel</button>
+    <button id="toggleDecBtn" onclick="toggleDecimals()">ocultar decimales</button>
+  </div>
+
+  <div class="levels" id="levels"></div>
+
+  <footer>IMA 1505 · Didáctica de los Sistemas Numéricos · PUCV · Jorge Gaona</footer>
+</div>
+
+<script>
+const POWERS = [1, 20, 400, 8000];
+const LABELS = ['unidades (×1)', 'veintenas (×20)', 'cuatrocientas (×400)', 'ocho miles (×8000)'];
+let levels = [{ dots: 0, bars: 0 }];
+
+function digitValue(l) { return l.bars * 5 + l.dots; }
+function levelMultiplier(i) { return POWERS[i] || Math.pow(20, i); }
+
+function totalValue() {
+  return levels.reduce((sum, l, i) => sum + digitValue(l) * levelMultiplier(i), 0);
+}
+
+function decomp() {
+  let parts = [];
+  for (let i = levels.length - 1; i >= 0; i--) {
+    let v = digitValue(levels[i]);
+    parts.push(v + ' × ' + levelMultiplier(i).toLocaleString());
+  }
+  return parts.join(' + ') || '0';
+}
+
+function isDark() {
+  return window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+}
+
+function drawDigit(canvas, l) {
+  const dpr = window.devicePixelRatio || 1;
+  const W = 80, H = 90;
+  canvas.width = W * dpr; canvas.height = H * dpr;
+  canvas.style.width = W + 'px'; canvas.style.height = H + 'px';
+  const ctx = canvas.getContext('2d');
+  ctx.scale(dpr, dpr);
+  ctx.clearRect(0, 0, W, H);
+
+  const fg = isDark() ? '#e5e5e3' : '#1a1a1a';
+  const dots = l.dots, bars = l.bars;
+  const val = dots + bars * 5;
+
+  if (val === 0) {
+    drawZero(ctx, W / 2, H / 2, fg);
+    return;
+  }
+
+  const barH = 6, barW = 60, dotR = 5, gap = 4;
+  const barsHeight = bars > 0 ? bars * barH + (bars - 1) * gap : 0;
+  const dotsHeight = dots > 0 ? dotR * 2 : 0;
+  const totalH = dotsHeight + (dotsHeight > 0 && barsHeight > 0 ? 8 : 0) + barsHeight;
+  let y = (H - totalH) / 2;
+
+  if (dots > 0) {
+    const totalDotsW = dots * dotR * 2 + (dots - 1) * gap;
+    let dx = (W - totalDotsW) / 2;
+    ctx.fillStyle = fg;
+    for (let i = 0; i < dots; i++) {
+      ctx.beginPath();
+      ctx.arc(dx + dotR, y + dotR, dotR, 0, Math.PI * 2);
+      ctx.fill();
+      dx += dotR * 2 + gap;
+    }
+    y += dotR * 2 + 8;
+  }
+
+  ctx.strokeStyle = fg;
+  ctx.lineWidth = 3;
+  for (let i = 0; i < bars; i++) {
+    ctx.beginPath();
+    ctx.moveTo((W - barW) / 2, y + barH / 2);
+    ctx.lineTo((W - barW) / 2 + barW, y + barH / 2);
+    ctx.stroke();
+    y += barH + gap;
+  }
+}
+
+function drawZero(ctx, cx, cy, fg) {
+  ctx.strokeStyle = fg;
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.ellipse(cx, cy, 22, 13, 0, 0, Math.PI * 2);
+  ctx.stroke();
+  ctx.beginPath();
+  ctx.moveTo(cx - 22, cy - 2);
+  ctx.lineTo(cx + 22, cy - 2);
+  ctx.stroke();
+  const curves = [
+    [cx - 6, cy - 13, cx - 10, cy - 4, cx - 8, cy - 2],
+    [cx + 4,  cy - 13, cx + 2,  cy - 4, cx + 4,  cy - 2],
+    [cx + 14, cy - 10, cx + 12, cy - 4, cx + 14, cy - 2]
+  ];
+  curves.forEach(([x0, y0, cx1, cy1, x1, y1]) => {
+    ctx.beginPath();
+    ctx.moveTo(x0, y0);
+    ctx.quadraticCurveTo(cx1, cy1, x1, y1);
+    ctx.stroke();
+  });
+}
+
+function renderAll() {
+  const container = document.getElementById('levels');
+
+  levels.forEach((l, i) => {
+    let levelEl = document.getElementById('level-' + i);
+    if (!levelEl) {
+      levelEl = document.createElement('div');
+      levelEl.className = 'level';
+      levelEl.id = 'level-' + i;
+      levelEl.innerHTML = `
+        <div class="level-header">
+          <span class="level-label">${LABELS[i] || 'posición ×' + levelMultiplier(i).toLocaleString()}</span>
+          <div style="display:flex;gap:8px;align-items:center">
+            <span class="level-value" id="lval-${i}">0</span>
+          </div>
+        </div>
+        <div class="level-controls">
+          <button onclick="addDot(${i})">+ punto (1)</button>
+          <button onclick="addBar(${i})">+ barra (5)</button>
+          <button onclick="removeLast(${i})">− quitar último</button>
+          <button onclick="clearLevel(${i})">limpiar</button>
+        </div>
+        <div class="level-display">
+          <canvas class="digit" id="canvas-${i}"></canvas>
+          <span class="digit-info" id="dinfo-${i}"></span>
+        </div>`;
+      container.appendChild(levelEl);
+    }
+
+    const canvas = document.getElementById('canvas-' + i);
+    drawDigit(canvas, l);
+    document.getElementById('lval-' + i).textContent = digitValue(l);
+    const v = digitValue(l);
+    const mult = levelMultiplier(i);
+    document.getElementById('dinfo-' + i).textContent =
+      v + ' × ' + mult.toLocaleString() + ' = ' + (v * mult).toLocaleString();
+  });
+
+  Array.from(container.children).forEach(el => {
+    const idx = parseInt(el.id.replace('level-', ''));
+    if (idx >= levels.length) container.removeChild(el);
+  });
+
+  document.getElementById('resDecimal').textContent = totalValue().toLocaleString();
+  document.getElementById('resDecomp').textContent = decomp();
+  document.getElementById('addLevelBtn').style.display = levels.length < 4 ? 'inline-block' : 'none';
+  document.getElementById('delLevelBtn').style.display = levels.length > 1 ? 'inline-block' : 'none';
+}
+
+function addDot(i) {
+  levels[i].dots++;
+  if (levels[i].dots >= 5) {
+    levels[i].dots -= 5;
+    addBar(i);
+    return;
+  }
+  renderAll();
+}
+function addBar(i) {
+  levels[i].bars++;
+  if (levels[i].bars >= 4) {
+    levels[i].bars -= 4;
+    if (i + 1 >= levels.length) {
+      if (levels.length < 4) levels.push({ dots: 0, bars: 0 });
+      else { levels[i].bars = 3; renderAll(); return; }
+    }
+    addDot(i + 1);
+    return;
+  }
+  renderAll();
+}
+function removeLast(i) {
+  if (levels[i].dots > 0) levels[i].dots--;
+  else if (levels[i].bars > 0) levels[i].bars--;
+  renderAll();
+}
+function clearLevel(i) { levels[i] = { dots: 0, bars: 0 }; renderAll(); }
+
+function addLevel() {
+  if (levels.length < 4) { levels.push({ dots: 0, bars: 0 }); renderAll(); }
+}
+function removeTopLevel() {
+  if (levels.length > 1) {
+    const i = levels.length - 1;
+    levels.splice(i, 1);
+    const el = document.getElementById('level-' + i);
+    if (el) el.remove();
+    renderAll();
+  }
+}
+let decimalsVisible = true;
+function toggleDecimals() {
+  decimalsVisible = !decimalsVisible;
+  document.querySelector('.app').classList.toggle('decimals-hidden', !decimalsVisible);
+  document.getElementById('toggleDecBtn').textContent =
+    decimalsVisible ? 'ocultar decimales' : 'mostrar decimales';
+}
+function clearAll() {
+  levels = [{ dots: 0, bars: 0 }];
+  document.getElementById('levels').innerHTML = '';
+  document.getElementById('decInput').value = '';
+  renderAll();
+}
+
+function decToMaya() {
+  let n = parseInt(document.getElementById('decInput').value);
+  if (isNaN(n) || n < 0 || n > 159999) return;
+  document.getElementById('levels').innerHTML = '';
+  levels = [];
+  if (n === 0) {
+    levels = [{ dots: 0, bars: 0 }];
+    renderAll(); return;
+  }
+  let tmp = n;
+  while (tmp > 0) {
+    const r = tmp % 20;
+    levels.push({ bars: Math.floor(r / 5), dots: r % 5 });
+    tmp = Math.floor(tmp / 20);
+  }
+  renderAll();
+}
+
+window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', renderAll);
+renderAll();
+</script>
+</body>
+</html>
