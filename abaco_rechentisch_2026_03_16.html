@@ -1,0 +1,291 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Ábaco de Tablero · Rechentisch</title>
+<style>
+:root{--parch:#f0e8d0;--ld:#1a1208;--lm:#6b4a1e;--serif:'Palatino Linotype',Palatino,Georgia,serif;}
+*{margin:0;padding:0;box-sizing:border-box;}
+body{background:#e8dbb8;min-height:100vh;display:flex;align-items:flex-start;justify-content:center;padding:24px 12px 40px;font-family:var(--serif);}
+#aw{font-family:var(--serif);background:var(--parch);border:2px solid var(--lm);border-radius:5px;padding:14px 8px 8px;width:100%;max-width:660px;user-select:none;box-shadow:0 6px 24px rgba(0,0,0,0.25);}
+.a-title{text-align:center;font-size:12px;letter-spacing:.22em;color:var(--ld);text-transform:uppercase;margin-bottom:9px;opacity:.6;}
+#bsvg{display:block;width:100%;}
+.inp-row{display:grid;grid-template-columns:44px 1fr 1fr 1fr;gap:0;}
+.inp-spacer{}
+.zone-inp-wrap{display:flex;flex-direction:column;align-items:center;gap:3px;padding:6px 6px 4px;}
+.zone-inp{width:100%;background:rgba(255,255,255,.6);border:1px solid var(--lm);border-radius:4px;color:var(--ld);font-family:var(--serif);font-size:13px;text-align:center;padding:4px;outline:none;-moz-appearance:textfield;box-sizing:border-box;}
+.zone-inp::-webkit-outer-spin-button,.zone-inp::-webkit-inner-spin-button{-webkit-appearance:none;}
+.zone-inp:focus{border-color:var(--ld);}
+.opt-zbtn{background:linear-gradient(135deg,#7a4010,#5a2c08);border:1px solid #b07030;border-radius:4px;color:#f4e9d0;font-family:var(--serif);font-size:10px;padding:3px 0;cursor:pointer;width:100%;}
+.opt-zbtn:hover{opacity:.88;}
+.cbar{display:flex;align-items:center;justify-content:center;flex-wrap:wrap;gap:6px;margin-top:8px;}
+.cbtn{background:transparent;border:1px solid var(--lm);border-radius:13px;padding:5px 14px;font-size:11px;font-family:var(--serif);color:var(--ld);cursor:pointer;transition:background .15s;}
+.cbtn:hover{background:rgba(100,60,10,.13);}
+.cbtn.on{background:rgba(100,60,10,.2);border-color:var(--ld);}
+.rc{margin-top:8px;background:rgba(0,0,0,.04);border:1px solid rgba(80,50,10,.22);border-radius:5px;padding:7px 14px;text-align:center;}
+.rl2{font-size:9px;color:var(--lm);letter-spacing:.18em;text-transform:uppercase;}
+.rn{font-size:26px;color:var(--ld);font-family:var(--serif);line-height:1.1;transition:filter .3s;}
+.rr{font-size:12px;color:var(--lm);font-style:italic;margin-top:2px;}
+.foot{text-align:center;font-size:9.5px;color:var(--lm);opacity:.7;letter-spacing:.08em;margin-top:9px;padding-top:7px;border-top:1px solid rgba(107,74,30,.25);font-style:italic;}
+.hctrl .pm-grp{display:none;}
+.hvals .ztxt,.hvals .rn,.hvals .rr,.hvals .rl2{opacity:0!important;}
+</style>
+</head>
+<body>
+<div id="aw">
+  <div class="a-title">Ábaco de Tablero · <em>Rechentisch</em></div>
+  <svg id="bsvg"></svg>
+  <div class="inp-row">
+    <span class="inp-spacer"></span>
+    <div class="zone-inp-wrap">
+      <input type="number" class="zone-inp" id="oi-0" placeholder="Izquierda" min="0" max="3999999">
+      <button class="opt-zbtn" onclick="optimizeZone(0)">▶ Optimizar</button>
+    </div>
+    <div class="zone-inp-wrap">
+      <input type="number" class="zone-inp" id="oi-1" placeholder="Centro" min="0" max="3999999">
+      <button class="opt-zbtn" onclick="optimizeZone(1)">▶ Optimizar</button>
+    </div>
+    <div class="zone-inp-wrap">
+      <input type="number" class="zone-inp" id="oi-2" placeholder="Derecha" min="0" max="3999999">
+      <button class="opt-zbtn" onclick="optimizeZone(2)">▶ Optimizar</button>
+    </div>
+  </div>
+  <div class="cbar">
+    <button class="cbtn on" id="bc" onclick="togCtrl()">Ocultar controles</button>
+    <button class="cbtn"    id="bv" onclick="togVals()">Ocultar valores</button>
+    <button class="cbtn" onclick="clearAll()">Limpiar todo</button>
+  </div>
+  <div class="rc">
+    <div class="rl2">Total del tablero</div>
+    <div class="rn" id="rn">0</div>
+    <div class="rr" id="rr">—</div>
+  </div>
+  <div class="foot">IMA 1505 · Didáctica de los Sistemas Numéricos · PUCV · Jorge Gaona</div>
+</div>
+
+<script>
+const NS='http://www.w3.org/2000/svg';
+function el(tag,a){const e=document.createElementNS(NS,tag);for(const k in a)e.setAttribute(k,a[k]);return e;}
+
+const LEVELS=[
+  {sym:'M\u0305',val:1000000,line:true},
+  {sym:'D\u0305',val:500000, line:false},
+  {sym:'C\u0305',val:100000, line:true},
+  {sym:'L\u0305',val:50000,  line:false},
+  {sym:'X\u0305',val:10000,  line:true},
+  {sym:'V\u0305',val:5000,   line:false},
+  {sym:'M',      val:1000,  line:true},
+  {sym:'D',      val:500,   line:false},
+  {sym:'C',      val:100,   line:true},
+  {sym:'L',      val:50,    line:false},
+  {sym:'X',      val:10,    line:true},
+  {sym:'V',      val:5,     line:false},
+  {sym:'I',      val:1,     line:true},
+];
+
+const LINE_PITCH=40, PAD_T=22, PAD_B=20;
+const LABEL_W=44, SVG_W=560;
+const ZONE_W=(SVG_W-LABEL_W)/3;
+const SVG_H=PAD_T+6*LINE_PITCH+PAD_B+14;
+const MAX_F=9, FR=5.5, FGAP=2.2, BTN_R=7;
+
+function levelY(li){
+  if(LEVELS[li].line) return PAD_T+(li/2)*LINE_PITCH;
+  const yA=PAD_T+((li-1)/2)*LINE_PITCH;
+  const yB=PAD_T+((li+1)/2)*LINE_PITCH;
+  return (yA+yB)/2;
+}
+
+let state=[];
+for(let li=0;li<13;li++) state.push([0,0,0]);
+let showCtrl=true, showVals=true;
+
+const svg=document.getElementById('bsvg');
+svg.setAttribute('viewBox',`0 0 ${SVG_W} ${SVG_H}`);
+svg.setAttribute('style',"font-family:'Palatino Linotype',Palatino,Georgia,serif;");
+
+const gBg=el('g',{}), gFich=el('g',{}), gVals=el('g',{}), gCtrl=el('g',{'class':'pm-grp'});
+svg.appendChild(gBg); svg.appendChild(gFich); svg.appendChild(gVals); svg.appendChild(gCtrl);
+
+function buildStatic(){
+  gBg.appendChild(el('rect',{x:LABEL_W,y:0,width:SVG_W-LABEL_W,height:SVG_H,fill:'#e8dcc0'}));
+  gBg.appendChild(el('rect',{x:0,y:0,width:SVG_W,height:SVG_H,fill:'none',stroke:'#2a1a06','stroke-width':'1.5',rx:'2'}));
+
+  // fondos de espacios (entre líneas)
+  for(let li=1;li<13;li+=2){
+    const yA=levelY(li-1), yB=levelY(li+1);
+    gBg.appendChild(el('rect',{x:LABEL_W,y:yA,width:SVG_W-LABEL_W,height:yB-yA,fill:'rgba(255,255,255,0.18)'}));
+  }
+
+  // líneas horizontales principales
+  for(let li=0;li<13;li+=2){
+    const y=levelY(li), lw=li===6?2.4:1.0;
+    gBg.appendChild(el('line',{x1:LABEL_W,y1:y,x2:SVG_W,y2:y,stroke:'#1a1208','stroke-width':String(lw)}));
+  }
+
+  // etiquetas izquierda
+  for(let li=0;li<13;li++){
+    const y=levelY(li), isL=LEVELS[li].line;
+    const t=el('text',{x:LABEL_W-5,y,'text-anchor':'end','dominant-baseline':'middle',
+      'font-size':isL?'13':'10','font-weight':isL?'bold':'normal',fill:'#1a1208',opacity:isL?'1':'0.6'});
+    t.textContent=LEVELS[li].sym;
+    gBg.appendChild(t);
+  }
+
+  // divisores verticales punteados
+  for(let zi=1;zi<3;zi++){
+    const x=LABEL_W+zi*ZONE_W;
+    gBg.appendChild(el('line',{x1:x,y1:0,x2:x,y2:SVG_H,stroke:'#6b4a1e','stroke-width':'0.7','stroke-dasharray':'5,4',opacity:'0.6'}));
+  }
+
+  // borde vertical izq del contenido
+  gBg.appendChild(el('line',{x1:LABEL_W,y1:0,x2:LABEL_W,y2:SVG_H,stroke:'#1a1208','stroke-width':'1.4'}));
+
+  // nombres de zonas
+  const zn=['Izquierda','Centro','Derecha'];
+  for(let zi=0;zi<3;zi++){
+    const cx=LABEL_W+zi*ZONE_W+ZONE_W/2;
+    const t=el('text',{x:cx,y:PAD_T-8,'text-anchor':'middle','font-size':'9',fill:'#6b4a1e','font-style':'italic',opacity:'0.7'});
+    t.textContent=zn[zi];
+    gBg.appendChild(t);
+  }
+}
+
+function renderFichas(){
+  while(gFich.firstChild) gFich.removeChild(gFich.firstChild);
+  for(let li=0;li<13;li++){
+    const cy=levelY(li);
+    for(let zi=0;zi<3;zi++){
+      const n=state[li][zi]; if(!n) continue;
+      const zx=LABEL_W+zi*ZONE_W;
+      const startX=zx+ZONE_W/2-(n-1)*(FR*2+FGAP)/2;
+      for(let i=0;i<n;i++){
+        const cx=startX+i*(FR*2+FGAP);
+        gFich.appendChild(el('circle',{cx,cy,r:FR,fill:'#1c1008',stroke:'rgba(255,255,255,0.07)','stroke-width':'0.4'}));
+        gFich.appendChild(el('ellipse',{cx:cx-FR*0.3,cy:cy-FR*0.3,rx:FR*0.25,ry:FR*0.18,fill:'rgba(255,255,255,0.13)'}));
+      }
+    }
+  }
+}
+
+function buildControls(){
+  while(gCtrl.firstChild) gCtrl.removeChild(gCtrl.firstChild);
+  for(let li=0;li<13;li++){
+    const cy=levelY(li);
+    for(let zi=0;zi<3;zi++){
+      const zx=LABEL_W+zi*ZONE_W;
+      const [bm,bp]=makePM(li,zi,zx+BTN_R+2,zx+ZONE_W-BTN_R-2,cy);
+      gCtrl.appendChild(bm); gCtrl.appendChild(bp);
+    }
+  }
+  updBtns();
+}
+
+function makePM(li,zi,xm,xp,cy){
+  function mkB(x,lbl,cb){
+    const g=el('g',{cursor:'pointer'});
+    g.id=`b${lbl==='\u2212'?'m':'p'}-${li}-${zi}`;
+    const bg=el('circle',{cx:x,cy,r:BTN_R,fill:'rgba(100,60,10,0.1)',stroke:'rgba(80,50,10,0.3)','stroke-width':'0.7'});
+    const tx=el('text',{x,y:cy+0.5,'text-anchor':'middle','dominant-baseline':'middle','font-size':'10',fill:'#2a1a06'});
+    tx.textContent=lbl;
+    g.appendChild(bg); g.appendChild(tx);
+    g.addEventListener('click',cb);
+    g.addEventListener('mouseenter',()=>bg.setAttribute('fill','rgba(100,60,10,0.25)'));
+    g.addEventListener('mouseleave',()=>bg.setAttribute('fill','rgba(100,60,10,0.1)'));
+    return g;
+  }
+  return [mkB(xm,'\u2212',()=>change(li,zi,-1)), mkB(xp,'+',()=>change(li,zi,+1))];
+}
+
+function updBtns(){
+  for(let li=0;li<13;li++) for(let zi=0;zi<3;zi++){
+    const n=state[li][zi];
+    const bm=document.getElementById(`bm-${li}-${zi}`);
+    const bp=document.getElementById(`bp-${li}-${zi}`);
+    if(bm){bm.style.opacity=n<=0?'0.18':'1'; bm.style.pointerEvents=n<=0?'none':'all';}
+    if(bp){bp.style.opacity=n>=MAX_F?'0.18':'1'; bp.style.pointerEvents=n>=MAX_F?'none':'all';}
+  }
+}
+
+function renderVals(){
+  while(gVals.firstChild) gVals.removeChild(gVals.firstChild);
+  let grand=0;
+  for(let zi=0;zi<3;zi++){
+    let zt=0;
+    for(let li=0;li<13;li++) zt+=state[li][zi]*LEVELS[li].val;
+    grand+=zt;
+    if(zt>0){
+      const cx=LABEL_W+zi*ZONE_W+ZONE_W/2;
+      const t=el('text',{x:cx,y:SVG_H-4,'text-anchor':'middle','font-size':'8.5',
+        fill:'#6b4a1e','font-style':'italic','class':'ztxt'});
+      t.textContent=zt.toLocaleString('es');
+      gVals.appendChild(t);
+    }
+  }
+  document.getElementById('rn').textContent=grand.toLocaleString('es');
+  document.getElementById('rr').textContent=toRoman(grand);
+}
+
+function change(li,zi,d){
+  const prev=state[li][zi];
+  state[li][zi]=Math.max(0,Math.min(MAX_F,state[li][zi]+d));
+  if(state[li][zi]!==prev){renderFichas();renderVals();updBtns();}
+}
+
+function optimizeZone(zi){
+  const raw=parseInt(document.getElementById('oi-'+zi).value);
+  let total=(!isNaN(raw)&&raw>=0)?raw:0;
+  if(total===0) for(let li=0;li<13;li++) total+=state[li][zi]*LEVELS[li].val;
+  if(!total) return;
+  let rem=total;
+  for(let li=0;li<13;li++){
+    const mf=LEVELS[li].line?4:1;
+    const cnt=Math.min(Math.floor(rem/LEVELS[li].val),mf);
+    state[li][zi]=cnt; rem-=cnt*LEVELS[li].val;
+  }
+  renderFichas(); renderVals(); updBtns();
+  const rn=document.getElementById('rn');
+  rn.style.filter='brightness(1.6)';
+  setTimeout(()=>rn.style.filter='',380);
+}
+
+function clearAll(){
+  for(let li=0;li<13;li++) state[li]=[0,0,0];
+  for(let zi=0;zi<3;zi++) document.getElementById('oi-'+zi).value='';
+  renderFichas(); renderVals(); updBtns();
+}
+
+function togCtrl(){
+  showCtrl=!showCtrl;
+  document.getElementById('aw').classList.toggle('hctrl',!showCtrl);
+  document.getElementById('bc').textContent=showCtrl?'Ocultar controles':'Mostrar controles';
+  document.getElementById('bc').classList.toggle('on',showCtrl);
+}
+function togVals(){
+  showVals=!showVals;
+  document.getElementById('aw').classList.toggle('hvals',!showVals);
+  document.getElementById('bv').textContent=showVals?'Ocultar valores':'Mostrar valores';
+  document.getElementById('bv').classList.toggle('on',!showVals);
+}
+
+function toRoman(n){
+  if(n<=0||isNaN(n)) return '\u2014';
+  if(n>3999999) return n.toLocaleString('es');
+  const vs=[1000000,900000,500000,400000,100000,90000,50000,40000,10000,9000,5000,4000,1000,900,500,400,100,90,50,40,10,9,5,4,1];
+  const ss=['M\u0305','C\u0305M\u0305','D\u0305','C\u0305D\u0305','C\u0305','X\u0305C\u0305','L\u0305','X\u0305L\u0305','X\u0305','MX\u0305','V\u0305','MV\u0305','M','CM','D','CD','C','XC','L','XL','X','IX','V','IV','I'];
+  let r='',i=0;
+  while(n>0&&i<vs.length){while(n>=vs[i]){r+=ss[i];n-=vs[i];}i++;}
+  return r;
+}
+
+for(let zi=0;zi<3;zi++){
+  document.getElementById('oi-'+zi).addEventListener('keydown',e=>{
+    if(e.key==='Enter') optimizeZone(zi);
+  });
+}
+
+buildStatic(); buildControls(); renderFichas(); renderVals();
+</script>
+</body>
+</html>
