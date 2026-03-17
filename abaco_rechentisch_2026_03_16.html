@@ -7,12 +7,11 @@
 <style>
 :root{--parch:#f0e8d0;--ld:#1a1208;--lm:#6b4a1e;--serif:'Palatino Linotype',Palatino,Georgia,serif;}
 *{margin:0;padding:0;box-sizing:border-box;}
-body{background:#e8dbb8;min-height:100vh;display:flex;align-items:flex-start;justify-content:center;padding:24px 12px 40px;font-family:var(--serif);}
-#aw{font-family:var(--serif);background:var(--parch);border:2px solid var(--lm);border-radius:5px;padding:14px 8px 8px;width:100%;max-width:660px;user-select:none;box-shadow:0 6px 24px rgba(0,0,0,0.25);}
+body{background:#ffffff;min-height:100vh;display:flex;align-items:flex-start;justify-content:center;padding:24px 12px 40px;font-family:var(--serif);}
+#aw{font-family:var(--serif);background:var(--parch);border:2px solid var(--lm);border-radius:5px;padding:14px 8px 8px;width:100%;max-width:660px;user-select:none;box-shadow:0 4px 18px rgba(0,0,0,0.12);}
 .a-title{text-align:center;font-size:12px;letter-spacing:.22em;color:var(--ld);text-transform:uppercase;margin-bottom:9px;opacity:.6;}
 #bsvg{display:block;width:100%;}
 .inp-row{display:grid;grid-template-columns:44px 1fr 1fr 1fr;gap:0;}
-.inp-spacer{}
 .zone-inp-wrap{display:flex;flex-direction:column;align-items:center;gap:3px;padding:6px 6px 4px;}
 .zone-inp{width:100%;background:rgba(255,255,255,.6);border:1px solid var(--lm);border-radius:4px;color:var(--ld);font-family:var(--serif);font-size:13px;text-align:center;padding:4px;outline:none;-moz-appearance:textfield;box-sizing:border-box;}
 .zone-inp::-webkit-outer-spin-button,.zone-inp::-webkit-inner-spin-button{-webkit-appearance:none;}
@@ -23,13 +22,9 @@ body{background:#e8dbb8;min-height:100vh;display:flex;align-items:flex-start;jus
 .cbtn{background:transparent;border:1px solid var(--lm);border-radius:13px;padding:5px 14px;font-size:11px;font-family:var(--serif);color:var(--ld);cursor:pointer;transition:background .15s;}
 .cbtn:hover{background:rgba(100,60,10,.13);}
 .cbtn.on{background:rgba(100,60,10,.2);border-color:var(--ld);}
-.rc{margin-top:8px;background:rgba(0,0,0,.04);border:1px solid rgba(80,50,10,.22);border-radius:5px;padding:7px 14px;text-align:center;}
-.rl2{font-size:9px;color:var(--lm);letter-spacing:.18em;text-transform:uppercase;}
-.rn{font-size:26px;color:var(--ld);font-family:var(--serif);line-height:1.1;transition:filter .3s;}
-.rr{font-size:12px;color:var(--lm);font-style:italic;margin-top:2px;}
 .foot{text-align:center;font-size:9.5px;color:var(--lm);opacity:.7;letter-spacing:.08em;margin-top:9px;padding-top:7px;border-top:1px solid rgba(107,74,30,.25);font-style:italic;}
 .hctrl .pm-grp{display:none;}
-.hvals .ztxt,.hvals .rn,.hvals .rr,.hvals .rl2{opacity:0!important;}
+.hvals .ztxt{opacity:0!important;}
 </style>
 </head>
 <body>
@@ -37,7 +32,7 @@ body{background:#e8dbb8;min-height:100vh;display:flex;align-items:flex-start;jus
   <div class="a-title">Ábaco de Tablero · <em>Rechentisch</em></div>
   <svg id="bsvg"></svg>
   <div class="inp-row">
-    <span class="inp-spacer"></span>
+    <span></span>
     <div class="zone-inp-wrap">
       <input type="number" class="zone-inp" id="oi-0" placeholder="Izquierda" min="0" max="3999999">
       <button class="opt-zbtn" onclick="optimizeZone(0)">▶ Optimizar</button>
@@ -55,11 +50,6 @@ body{background:#e8dbb8;min-height:100vh;display:flex;align-items:flex-start;jus
     <button class="cbtn on" id="bc" onclick="togCtrl()">Ocultar controles</button>
     <button class="cbtn"    id="bv" onclick="togVals()">Ocultar valores</button>
     <button class="cbtn" onclick="clearAll()">Limpiar todo</button>
-  </div>
-  <div class="rc">
-    <div class="rl2">Total del tablero</div>
-    <div class="rn" id="rn">0</div>
-    <div class="rr" id="rr">—</div>
   </div>
   <div class="foot">IMA 1505 · Didáctica de los Sistemas Numéricos · PUCV · Jorge Gaona</div>
 </div>
@@ -84,10 +74,10 @@ const LEVELS=[
   {sym:'I',      val:1,     line:true},
 ];
 
-const LINE_PITCH=40, PAD_T=22, PAD_B=20;
+const LINE_PITCH=40, PAD_T=22, PAD_B=32;
 const LABEL_W=44, SVG_W=560;
 const ZONE_W=(SVG_W-LABEL_W)/3;
-const SVG_H=PAD_T+6*LINE_PITCH+PAD_B+14;
+const SVG_H=PAD_T+6*LINE_PITCH+PAD_B;
 const MAX_F=9, FR=5.5, FGAP=2.2, BTN_R=7;
 
 function levelY(li){
@@ -95,6 +85,16 @@ function levelY(li){
   const yA=PAD_T+((li-1)/2)*LINE_PITCH;
   const yB=PAD_T+((li+1)/2)*LINE_PITCH;
   return (yA+yB)/2;
+}
+
+function toRoman(n){
+  if(n<=0||isNaN(n)) return '';
+  if(n>3999999) return n.toLocaleString('es');
+  const vs=[1000000,900000,500000,400000,100000,90000,50000,40000,10000,9000,5000,4000,1000,900,500,400,100,90,50,40,10,9,5,4,1];
+  const ss=['M\u0305','C\u0305M\u0305','D\u0305','C\u0305D\u0305','C\u0305','X\u0305C\u0305','L\u0305','X\u0305L\u0305','X\u0305','MX\u0305','V\u0305','MV\u0305','M','CM','D','CD','C','XC','L','XL','X','IX','V','IV','I'];
+  let r='',i=0;
+  while(n>0&&i<vs.length){while(n>=vs[i]){r+=ss[i];n-=vs[i];}i++;}
+  return r;
 }
 
 let state=[];
@@ -112,7 +112,7 @@ function buildStatic(){
   gBg.appendChild(el('rect',{x:LABEL_W,y:0,width:SVG_W-LABEL_W,height:SVG_H,fill:'#e8dcc0'}));
   gBg.appendChild(el('rect',{x:0,y:0,width:SVG_W,height:SVG_H,fill:'none',stroke:'#2a1a06','stroke-width':'1.5',rx:'2'}));
 
-  // fondos de espacios (entre líneas)
+  // fondos de espacios
   for(let li=1;li<13;li+=2){
     const yA=levelY(li-1), yB=levelY(li+1);
     gBg.appendChild(el('rect',{x:LABEL_W,y:yA,width:SVG_W-LABEL_W,height:yB-yA,fill:'rgba(255,255,255,0.18)'}));
@@ -138,8 +138,6 @@ function buildStatic(){
     const x=LABEL_W+zi*ZONE_W;
     gBg.appendChild(el('line',{x1:x,y1:0,x2:x,y2:SVG_H,stroke:'#6b4a1e','stroke-width':'0.7','stroke-dasharray':'5,4',opacity:'0.6'}));
   }
-
-  // borde vertical izq del contenido
   gBg.appendChild(el('line',{x1:LABEL_W,y1:0,x2:LABEL_W,y2:SVG_H,stroke:'#1a1208','stroke-width':'1.4'}));
 
   // nombres de zonas
@@ -210,21 +208,25 @@ function updBtns(){
 
 function renderVals(){
   while(gVals.firstChild) gVals.removeChild(gVals.firstChild);
-  let grand=0;
   for(let zi=0;zi<3;zi++){
     let zt=0;
     for(let li=0;li<13;li++) zt+=state[li][zi]*LEVELS[li].val;
-    grand+=zt;
     if(zt>0){
       const cx=LABEL_W+zi*ZONE_W+ZONE_W/2;
-      const t=el('text',{x:cx,y:SVG_H-4,'text-anchor':'middle','font-size':'8.5',
+      const arabic=zt.toLocaleString('es');
+      const roman=toRoman(zt);
+      // número arábigo arriba
+      const ta=el('text',{x:cx,y:SVG_H-18,'text-anchor':'middle','font-size':'10',
+        fill:'#1a1208','font-style':'normal','class':'ztxt'});
+      ta.textContent=arabic;
+      gVals.appendChild(ta);
+      // número romano abajo
+      const tr=el('text',{x:cx,y:SVG_H-6,'text-anchor':'middle','font-size':'9',
         fill:'#6b4a1e','font-style':'italic','class':'ztxt'});
-      t.textContent=zt.toLocaleString('es');
-      gVals.appendChild(t);
+      tr.textContent=roman;
+      gVals.appendChild(tr);
     }
   }
-  document.getElementById('rn').textContent=grand.toLocaleString('es');
-  document.getElementById('rr').textContent=toRoman(grand);
 }
 
 function change(li,zi,d){
@@ -245,9 +247,6 @@ function optimizeZone(zi){
     state[li][zi]=cnt; rem-=cnt*LEVELS[li].val;
   }
   renderFichas(); renderVals(); updBtns();
-  const rn=document.getElementById('rn');
-  rn.style.filter='brightness(1.6)';
-  setTimeout(()=>rn.style.filter='',380);
 }
 
 function clearAll(){
@@ -267,16 +266,6 @@ function togVals(){
   document.getElementById('aw').classList.toggle('hvals',!showVals);
   document.getElementById('bv').textContent=showVals?'Ocultar valores':'Mostrar valores';
   document.getElementById('bv').classList.toggle('on',!showVals);
-}
-
-function toRoman(n){
-  if(n<=0||isNaN(n)) return '\u2014';
-  if(n>3999999) return n.toLocaleString('es');
-  const vs=[1000000,900000,500000,400000,100000,90000,50000,40000,10000,9000,5000,4000,1000,900,500,400,100,90,50,40,10,9,5,4,1];
-  const ss=['M\u0305','C\u0305M\u0305','D\u0305','C\u0305D\u0305','C\u0305','X\u0305C\u0305','L\u0305','X\u0305L\u0305','X\u0305','MX\u0305','V\u0305','MV\u0305','M','CM','D','CD','C','XC','L','XL','X','IX','V','IV','I'];
-  let r='',i=0;
-  while(n>0&&i<vs.length){while(n>=vs[i]){r+=ss[i];n-=vs[i];}i++;}
-  return r;
 }
 
 for(let zi=0;zi<3;zi++){
