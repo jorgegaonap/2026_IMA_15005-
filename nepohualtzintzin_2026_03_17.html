@@ -1,0 +1,447 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Nepohualtzintzin</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      background: #e8e8e8;
+      display: flex; justify-content: center;
+      padding: 24px 12px;
+      font-family: sans-serif;
+      min-height: 100vh;
+    }
+    #app {
+      background: white;
+      padding: 20px 16px;
+      border-radius: 14px;
+      width: 100%;
+      max-width: 860px;
+      box-shadow: 0 2px 16px rgba(0,0,0,0.13);
+    }
+    .header { text-align: center; margin-bottom: 14px; }
+    .header h1 { font-size: 22px; font-weight: 700; color: #111; }
+    .header p  { font-size: 13px; color: #666; margin-top: 4px; }
+
+    .controls {
+      display: flex; flex-wrap: wrap; gap: 8px;
+      align-items: center; justify-content: center;
+      margin-bottom: 14px;
+    }
+    .controls input[type=number] {
+      width: 160px; padding: 7px 10px; font-size: 14px;
+      border: 1.5px solid #bbb; border-radius: 8px; outline: none;
+    }
+    .controls input[type=number]:focus { border-color: #1565C0; }
+    .btn {
+      background: #fff; border: 1.5px solid #bbb;
+      border-radius: 8px; padding: 7px 16px;
+      font-size: 13px; cursor: pointer; color: #333;
+      transition: background 0.1s;
+      white-space: nowrap;
+    }
+    .btn:hover { background: #f0f0f0; }
+    .btn.toggled { background: #1565C0; color: #fff; border-color: #0D47A1; }
+
+    /* main layout */
+    .main-layout {
+      display: flex; gap: 8px; align-items: flex-start;
+    }
+    #frame {
+      flex: 1;
+      background: #f5f5f5;
+      border: 2px solid #ccc;
+      border-radius: 12px;
+      padding: 8px 8px;
+    }
+    #maya-col {
+      width: 60px; flex-shrink: 0;
+      display: flex; flex-direction: column;
+      gap: 4px;
+    }
+    .maya-cell {
+      display: flex; align-items: center; justify-content: center;
+      background: #f9f9f9;
+      border: 1px solid #ddd;
+      border-radius: 6px;
+    }
+
+    .row-wrap {
+      display: flex; align-items: center; gap: 6px;
+      margin-bottom: 4px;
+    }
+    .row-wrap:last-child { margin-bottom: 0; }
+
+    .track {
+      flex: 1; position: relative;
+      background: #fff;
+      border-radius: 23px;
+      border: 2px solid #ccc;
+      overflow: hidden;
+    }
+    .track-rod {
+      position: absolute; left: 0; right: 0; top: 50%;
+      height: 4px; background: #bbb;
+      transform: translateY(-50%); z-index: 0;
+    }
+    .track-div {
+      position: absolute; top: 3px; bottom: 3px; width: 5px;
+      background: #444; border-radius: 2px; z-index: 3;
+    }
+    .seed {
+      position: absolute; top: 50%;
+      transform: translateY(-50%);
+      border-radius: 50%;
+      border: 2px solid #aaa;
+      background: #ccc;
+      cursor: pointer; z-index: 2; outline: none;
+      transition: left 0.2s cubic-bezier(0.34,1.3,0.64,1);
+    }
+    .seed:hover { filter: brightness(0.88); }
+
+    .display {
+      background: #f5f5f5; border: 2px solid #ccc;
+      border-radius: 10px; padding: 12px 16px;
+      text-align: center; margin-top: 12px;
+    }
+    #total-arabic { font-size: 34px; font-weight: 700; color: #111; }
+    .display-lbl  { font-size: 12px; color: #888; margin-top: 2px; }
+
+    .legend {
+      display: flex; gap: 16px; flex-wrap: wrap;
+      justify-content: center; align-items: center;
+      font-size: 12px; color: #555; margin-top: 10px;
+    }
+    .ldot {
+      width: 13px; height: 13px; border-radius: 50%;
+      display: inline-block; vertical-align: middle;
+      margin-right: 4px; border: 2px solid #aaa;
+    }
+
+    .footer {
+      margin-top: 18px;
+      border-top: 1px solid #e8e8e8;
+      padding-top: 12px;
+      text-align: center;
+      font-size: 12px; color: #999; line-height: 1.7;
+    }
+    .footer strong { color: #555; font-weight: 600; }
+  </style>
+</head>
+<body>
+<div id="app">
+
+  <div class="header">
+    <h1>Nepohualtzintzin</h1>
+    <p>Ábaco mesoamericano · base 20 · toca una semilla para moverla</p>
+  </div>
+
+  <div class="controls">
+    <input type="number" id="input-num" min="0" placeholder="Escribe un número…" />
+    <button class="btn" onclick="setFromInput()">Representar ↵</button>
+    <button class="btn" id="btn-arabic" onclick="toggleArabic()">Ocultar números</button>
+    <button class="btn" id="btn-maya"   onclick="toggleMaya()">Ocultar maya</button>
+    <button class="btn" onclick="resetAll()">Limpiar</button>
+    <button class="btn" onclick="demo()">Aleatorio</button>
+  </div>
+
+  <div class="main-layout">
+    <div id="frame"></div>
+    <div id="maya-col"></div>
+  </div>
+
+  <div class="display">
+    <div id="total-arabic">0</div>
+    <div class="display-lbl">valor total</div>
+  </div>
+
+  <div class="legend">
+    <span><span class="ldot" style="background:#ccc;border-color:#aaa;"></span>inactiva</span>
+    <span><span class="ldot" style="background:#1565C0;border-color:#0D47A1;"></span>activa</span>
+    <span style="color:#aaa;">· izquierda del divisor = 5 · derecha = 1</span>
+  </div>
+
+  <div class="footer">
+    <strong>IMA 1505 · Didáctica de los Sistemas Numéricos</strong><br>
+    PUCV · Jorge Gaona
+  </div>
+
+</div><!-- #app -->
+
+<script>
+/* ─── CONFIG ─── */
+const ROWS = 13;
+const SD   = 34;   // seed diameter px
+const GAP  = 5;
+const PAD  = 8;
+const DIVW = 5;
+const ROW_H = SD + 6;  // track height
+
+const COL_OFF = '#CCCCCC', BRD_OFF = '#AAAAAA';
+const COL_ON  = '#1565C0', BRD_ON  = '#0D47A1';
+
+const pow20 = Array.from({length:ROWS}, (_,i) => Math.pow(20,i));
+const state = Array.from({length:ROWS}, () => ({
+  l: [false,false,false],
+  r: [false,false,false,false]
+}));
+
+let showArabic = true;
+let showMaya   = true;
+
+/* ─── MAYA NUMERAL SVG ─── */
+// Returns SVG inner elements for digit 0-19
+// Vertical layout: dots on top, bars below
+function mayaGlyph(n, W, H) {
+  if (n === 0) {
+    // Shell
+    const cx = W/2, cy = H/2;
+    const rx = W/2 - 5, ry = 7;
+    return `<ellipse cx="${cx}" cy="${cy}" rx="${rx}" ry="${ry}"
+              fill="none" stroke="#333" stroke-width="1.8"/>
+            <ellipse cx="${cx}" cy="${cy+1}" rx="${rx-5}" ry="3"
+              fill="none" stroke="#333" stroke-width="1.2"/>`;
+  }
+
+  const bars = Math.floor(n / 5);
+  const dots = n % 5;
+
+  const DOT_R  = 4;
+  const BAR_W  = W - 10;
+  const BAR_H  = 5;
+  const DOT_SPACING = DOT_R*2 + 3;
+  const BAR_SPACING = BAR_H + 3;
+
+  const dotsH = dots > 0 ? DOT_R * 2 : 0;
+  const sep   = dots > 0 && bars > 0 ? 4 : 0;
+  const barsH = bars > 0 ? bars * BAR_H + (bars-1)*3 : 0;
+  const totalH = dotsH + sep + barsH;
+
+  let y = (H - totalH) / 2;
+  let out = '';
+
+  // dots
+  if (dots > 0) {
+    const totalDW = dots * DOT_SPACING - 3;
+    let dx = (W - totalDW) / 2 + DOT_R;
+    for (let d = 0; d < dots; d++) {
+      out += `<circle cx="${dx.toFixed(1)}" cy="${(y+DOT_R).toFixed(1)}" r="${DOT_R}" fill="#333"/>`;
+      dx += DOT_SPACING;
+    }
+    y += DOT_R*2 + sep;
+  }
+
+  // bars
+  const bx = (W - BAR_W) / 2;
+  for (let b = 0; b < bars; b++) {
+    out += `<rect x="${bx.toFixed(1)}" y="${y.toFixed(1)}" width="${BAR_W}" height="${BAR_H}" rx="2" fill="#333"/>`;
+    y += BAR_SPACING;
+  }
+
+  return out;
+}
+
+function makeMayaSVG(n) {
+  const W = 56, H = ROW_H - 2;
+  return `<svg width="${W}" height="${H}" viewBox="0 0 ${W} ${H}">${mayaGlyph(n,W,H)}</svg>`;
+}
+
+/* ─── BUILD DOM ─── */
+function divX(tw)          { return Math.floor(tw * 3/7); }
+function lPos(tw,s,on,rk)  { return on ? divX(tw)-PAD-SD-rk*(SD+GAP) : PAD+s*(SD+GAP); }
+function rPos(tw,s,on,rk)  { return on ? divX(tw)+DIVW+PAD+rk*(SD+GAP) : tw-PAD-SD-(3-s)*(SD+GAP); }
+
+function buildDOM() {
+  const frame = document.getElementById('frame');
+  frame.innerHTML = '';
+  const mayaCol = document.getElementById('maya-col');
+  mayaCol.innerHTML = '';
+
+  for (let r = ROWS-1; r >= 0; r--) {
+    // abacus row
+    const row = document.createElement('div');
+    row.className = 'row-wrap';
+
+    const track = document.createElement('div');
+    track.className = 'track';
+    track.id = 'tr'+r;
+    track.style.height = ROW_H + 'px';
+
+    const rod = document.createElement('div');
+    rod.className = 'track-rod';
+    track.appendChild(rod);
+
+    const dv = document.createElement('div');
+    dv.className = 'track-div';
+    dv.id = 'dv'+r;
+    track.appendChild(dv);
+
+    row.appendChild(track);
+    frame.appendChild(row);
+
+    // maya cell
+    const cell = document.createElement('div');
+    cell.className = 'maya-cell';
+    cell.id = 'maya-'+r;
+    cell.style.height = ROW_H + 'px';
+    cell.style.display = showMaya ? 'flex' : 'none';
+    cell.innerHTML = makeMayaSVG(0);
+    mayaCol.appendChild(cell);
+  }
+
+  // place seeds after layout
+  requestAnimationFrame(() => {
+    for (let r = 0; r < ROWS; r++) {
+      const track = document.getElementById('tr'+r);
+      const dv    = document.getElementById('dv'+r);
+      if (!track) continue;
+      const tw = track.getBoundingClientRect().width;
+      dv.style.left = divX(tw) + 'px';
+
+      for (let s = 0; s < 3; s++) {
+        const b = makeSeed(r, s, 'l');
+        b.style.left = lPos(tw, s, false, 0) + 'px';
+        track.appendChild(b);
+      }
+      for (let s = 0; s < 4; s++) {
+        const b = makeSeed(r, s, 'r');
+        b.style.left = rPos(tw, s, false, 0) + 'px';
+        track.appendChild(b);
+      }
+    }
+  });
+}
+
+function makeSeed(r, s, side) {
+  const b = document.createElement('button');
+  b.id = `s${side}${r}_${s}`;
+  b.className = 'seed';
+  b.style.width  = SD + 'px';
+  b.style.height = SD + 'px';
+  b.style.background  = COL_OFF;
+  b.style.borderColor = BRD_OFF;
+  b.addEventListener('click', side==='l' ? ()=>toggleL(r,s) : ()=>toggleR(r,s));
+  return b;
+}
+
+/* ─── REPOS ─── */
+function repos(r) {
+  const track = document.getElementById('tr'+r);
+  if (!track) return;
+  const tw = track.getBoundingClientRect().width;
+
+  const actL = [0,1,2].filter(s => state[r].l[s]);
+  for (let s = 0; s < 3; s++) {
+    const el = document.getElementById(`sl${r}_${s}`);
+    if (!el) continue;
+    const on   = state[r].l[s];
+    const rank = on ? actL.length-1-actL.indexOf(s) : 0;
+    el.style.left        = lPos(tw,s,on,rank) + 'px';
+    el.style.background  = on ? COL_ON : COL_OFF;
+    el.style.borderColor = on ? BRD_ON : BRD_OFF;
+  }
+  const actR = [0,1,2,3].filter(s => state[r].r[s]);
+  for (let s = 0; s < 4; s++) {
+    const el = document.getElementById(`sr${r}_${s}`);
+    if (!el) continue;
+    const on   = state[r].r[s];
+    const rank = on ? actR.indexOf(s) : 0;
+    el.style.left        = rPos(tw,s,on,rank) + 'px';
+    el.style.background  = on ? COL_ON : COL_OFF;
+    el.style.borderColor = on ? BRD_ON : BRD_OFF;
+  }
+}
+
+/* ─── SYNC ─── */
+function rowVal(r) {
+  return state[r].l.filter(Boolean).length*5 + state[r].r.filter(Boolean).length;
+}
+function getTotal() {
+  let t = 0;
+  for (let i = 0; i < ROWS; i++) t += rowVal(i) * pow20[i];
+  return t;
+}
+function syncDisplay() {
+  const el = document.getElementById('total-arabic');
+  if (!el) return;
+  el.textContent = getTotal().toLocaleString('es-MX');
+  el.style.display = showArabic ? '' : 'none';
+  document.querySelector('.display-lbl').style.display = showArabic ? '' : 'none';
+}
+function syncMayaRow(r) {
+  const cell = document.getElementById('maya-'+r);
+  if (cell) cell.innerHTML = makeMayaSVG(rowVal(r));
+}
+function syncAll() {
+  for (let r = 0; r < ROWS; r++) { repos(r); syncMayaRow(r); }
+  syncDisplay();
+}
+
+/* ─── TOGGLE ─── */
+function toggleL(r,s) { state[r].l[s]=!state[r].l[s]; repos(r); syncMayaRow(r); syncDisplay(); }
+function toggleR(r,s) { state[r].r[s]=!state[r].r[s]; repos(r); syncMayaRow(r); syncDisplay(); }
+
+/* ─── REPRESENT NUMBER ─── */
+function representNumber(n) {
+  n = Math.max(0, Math.floor(n));
+  for (let r = 0; r < ROWS; r++) {
+    const digit = n % 20;
+    n = Math.floor(n / 20);
+    const bars = Math.floor(digit / 5);
+    const dots = digit % 5;
+    state[r].l = [bars>=1, bars>=2, bars>=3];
+    state[r].r = [dots>=1, dots>=2, dots>=3, dots>=4];
+  }
+  syncAll();
+}
+function setFromInput() {
+  const v = parseInt(document.getElementById('input-num').value, 10);
+  if (!isNaN(v) && v >= 0) representNumber(v);
+}
+
+/* ─── VISIBILITY TOGGLES ─── */
+function toggleArabic() {
+  showArabic = !showArabic;
+  const btn = document.getElementById('btn-arabic');
+  btn.textContent = showArabic ? 'Ocultar números' : 'Mostrar números';
+  btn.classList.toggle('toggled', !showArabic);
+  syncDisplay();
+}
+function toggleMaya() {
+  showMaya = !showMaya;
+  const btn = document.getElementById('btn-maya');
+  btn.textContent = showMaya ? 'Ocultar maya' : 'Mostrar maya';
+  btn.classList.toggle('toggled', !showMaya);
+  document.querySelectorAll('.maya-cell').forEach(c => {
+    c.style.display = showMaya ? 'flex' : 'none';
+  });
+  document.getElementById('maya-col').style.display = showMaya ? 'flex' : 'none';
+}
+
+/* ─── RESET / DEMO ─── */
+function resetAll() {
+  for (let r = 0; r < ROWS; r++) {
+    state[r].l = [false,false,false];
+    state[r].r = [false,false,false,false];
+  }
+  document.getElementById('input-num').value = '';
+  syncAll();
+}
+function demo() {
+  const n = Math.floor(Math.random() * 500000);
+  document.getElementById('input-num').value = n;
+  representNumber(n);
+}
+
+/* ─── ENTER KEY ─── */
+document.getElementById('input-num').addEventListener('keydown', e => {
+  if (e.key === 'Enter') setFromInput();
+});
+
+/* ─── INIT ─── */
+buildDOM();
+</script>
+</body>
+</html>
