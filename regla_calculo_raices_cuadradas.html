@@ -1,5 +1,5 @@
 
-<h2 class="sr-only">Regla de cálculo para raíces cuadradas, solo visual</h2>
+<h2 class="sr-only">Regla de cálculo para raíces cuadradas</h2>
 <style>
   .rw { padding: 2rem 0; user-select: none; }
   .rule-body { background: #e8ddb5; border-radius: 4px; border: 1px solid #b8a870; padding: 10px 0 6px; cursor: ew-resize; }
@@ -38,26 +38,35 @@ function buildA() {
   const g = document.getElementById('sA');
   let h = '';
   const ticks = [
-    {v:1,h:55,label:true}, {v:1.5,h:30}, {v:2,h:55,label:true}, {v:2.5,h:30},
+    {v:1,h:65,label:true,big:true},
+    {v:1.5,h:30}, {v:2,h:55,label:true}, {v:2.5,h:30},
     {v:3,h:55,label:true}, {v:3.5,h:30}, {v:4,h:55,label:true}, {v:4.5,h:30},
     {v:5,h:55,label:true}, {v:5.5,h:30}, {v:6,h:55,label:true}, {v:6.5,h:30},
     {v:7,h:55,label:true}, {v:7.5,h:30}, {v:8,h:55,label:true}, {v:8.5,h:30},
     {v:9,h:55,label:true}, {v:9.5,h:30},
     {v:10,h:65,label:true,big:true},
-    {v:15,h:30},{v:20,h:55,label:true},{v:25,h:30},{v:30,h:55,label:true},
-    {v:35,h:30},{v:40,h:55,label:true},{v:45,h:30},{v:50,h:55,label:true},
-    {v:55,h:30},{v:60,h:55,label:true},{v:65,h:30},{v:70,h:55,label:true},
-    {v:75,h:30},{v:80,h:55,label:true},{v:85,h:30},{v:90,h:55,label:true},
-    {v:95,h:30},{v:100,h:65,label:true,big:true},
+    {v:11,h:22},{v:12,h:22},{v:13,h:22},{v:14,h:22},{v:15,h:40},
+    {v:16,h:22},{v:17,h:22},{v:18,h:22},{v:19,h:22},
+    {v:20,h:55,label:true},
+    {v:21,h:22},{v:22,h:22},{v:23,h:22},{v:24,h:22},{v:25,h:40},
+    {v:26,h:22},{v:27,h:22},{v:28,h:22},{v:29,h:22},
+    {v:30,h:55,label:true},
+    {v:31,h:22},{v:32,h:22},{v:33,h:22},{v:34,h:22},{v:35,h:40},
+    {v:36,h:22},{v:37,h:22},{v:38,h:22},{v:39,h:22},
+    {v:40,h:55,label:true},
+    {v:42,h:22},{v:44,h:22},{v:46,h:22},{v:48,h:22},
+    {v:50,h:55,label:true},
+    {v:52,h:22},{v:54,h:22},{v:56,h:22},{v:58,h:22},
+    {v:60,h:55,label:true},
+    {v:62,h:22},{v:64,h:22},{v:66,h:22},{v:68,h:22},
+    {v:70,h:55,label:true},
+    {v:72,h:22},{v:74,h:22},{v:76,h:22},{v:78,h:22},
+    {v:80,h:55,label:true},
+    {v:82,h:22},{v:84,h:22},{v:86,h:22},{v:88,h:22},
+    {v:90,h:55,label:true},
+    {v:92,h:22},{v:94,h:22},{v:96,h:22},{v:98,h:22},
+    {v:100,h:65,label:true,big:true},
   ];
-  for (let i=1; i<10; i++) for (let d=1; d<=9; d++) {
-    const v = i + d*0.1;
-    if (!ticks.find(t=>Math.abs(t.v-v)<0.01)) ticks.push({v,h:18});
-  }
-  for (let i=10; i<100; i+=5) {
-    const v = i + 2.5;
-    if (!ticks.find(t=>Math.abs(t.v-v)<0.01)) ticks.push({v,h:18});
-  }
   ticks.forEach(({v,h:th,label,big}) => {
     const x = xA(v).toFixed(2);
     const y1 = 88 - th;
