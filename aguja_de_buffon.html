@@ -1,0 +1,201 @@
+
+<style>
+  .stat-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-bottom: 1.25rem; }
+  .stat { background: var(--color-background-secondary); border-radius: var(--border-radius-md); padding: 0.75rem 1rem; }
+  .stat-label { font-size: 12px; color: var(--color-text-secondary); margin-bottom: 4px; }
+  .stat-value { font-size: 20px; font-weight: 500; color: var(--color-text-primary); font-variant-numeric: tabular-nums; }
+  .stat-value.hi { color: #185FA5; }
+  .controls { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; margin-bottom: 1.25rem; }
+  .btn { padding: 7px 16px; border-radius: var(--border-radius-md); border: 0.5px solid var(--color-border-secondary); background: var(--color-background-primary); color: var(--color-text-primary); cursor: pointer; font-size: 14px; }
+  .btn:hover { background: var(--color-background-secondary); }
+  .btn.primary { background: #185FA5; color: #E6F1FB; border-color: #185FA5; }
+  .btn.primary:hover { background: #0C447C; }
+  .btn.danger { background: var(--color-background-danger); color: var(--color-text-danger); border-color: var(--color-border-danger); }
+  .canvases { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  .canvas-wrap { background: var(--color-background-secondary); border-radius: var(--border-radius-md); padding: 8px; }
+  .canvas-title { font-size: 12px; color: var(--color-text-secondary); margin-bottom: 6px; padding-left: 4px; }
+  .speed-row { display:flex; align-items:center; gap:8px; font-size:13px; color:var(--color-text-secondary); }
+  @media (max-width: 520px) { .canvases { grid-template-columns: 1fr; } .stat-grid { grid-template-columns: repeat(2,1fr); } }
+</style>
+
+<h2 class="sr-only">Simulación corregida de la Aguja de Buffon para estimar π</h2>
+
+<div class="stat-grid">
+  <div class="stat"><div class="stat-label">Estimación de π</div><div class="stat-value hi" id="pi-val">–</div></div>
+  <div class="stat"><div class="stat-label">Cruces</div><div class="stat-value" id="cross-val">0</div></div>
+  <div class="stat"><div class="stat-label">Total agujas</div><div class="stat-value" id="total-val">0</div></div>
+</div>
+
+<div class="controls">
+  <button class="btn primary" id="btn-play" onclick="toggleSim()"><i class="ti ti-player-play" aria-hidden="true"></i> Iniciar</button>
+  <button class="btn danger" onclick="resetSim()"><i class="ti ti-refresh" aria-hidden="true"></i> Reiniciar</button>
+  <div class="speed-row">
+    <span>Velocidad</span>
+    <input type="range" id="speed" min="1" max="5" value="3" step="1" style="width:90px">
+    <span id="speed-lbl">media</span>
+  </div>
+</div>
+
+<div class="canvases">
+  <div class="canvas-wrap">
+    <div class="canvas-title">agujas sobre el piso</div>
+    <canvas id="floor" width="280" height="280" style="width:100%;height:auto;display:block;" role="img" aria-label="Agujas lanzadas sobre un piso con líneas paralelas"></canvas>
+  </div>
+  <div class="canvas-wrap">
+    <div class="canvas-title">convergencia hacia π</div>
+    <canvas id="conv" width="280" height="280" style="width:100%;height:auto;display:block;" role="img" aria-label="Gráfico de convergencia de la estimación de pi con la aguja de Buffon"></canvas>
+  </div>
+</div>
+
+<script>
+const floorC = document.getElementById('floor');
+const convC  = document.getElementById('conv');
+const fc = floorC.getContext('2d');
+const cc = convC.getContext('2d');
+
+const W = 280, H = 280;
+const D = 40;        // distancia entre líneas paralelas
+const L_TOTAL = 40;  // longitud TOTAL de la aguja (= D, caso L = D)
+const L_HALF  = 20;  // semilongitud, solo para dibujar los extremos
+const LINES = Math.floor(H / D) + 1;
+
+let crosses = 0, total = 0, running = false, animId = null;
+let history = [];
+const MAX_HIST = 300;
+const speedLabels = ['muy lenta','lenta','media','rápida','muy rápida'];
+const speedPoints = [1, 4, 12, 35, 80];
+
+document.getElementById('speed').addEventListener('input', e => {
+  document.getElementById('speed-lbl').textContent = speedLabels[e.target.value - 1];
+});
+
+function isDark() { return matchMedia('(prefers-color-scheme: dark)').matches; }
+
+function drawFloorBg() {
+  const dark = isDark();
+  fc.fillStyle = dark ? '#1e1e1e' : '#f0ebe0';
+  fc.fillRect(0, 0, W, H);
+  fc.strokeStyle = dark ? 'rgba(180,160,100,0.35)' : 'rgba(120,90,40,0.35)';
+  fc.lineWidth = 1;
+  for (let i = 0; i <= LINES; i++) {
+    const y = i * D;
+    fc.beginPath(); fc.moveTo(0, y); fc.lineTo(W, y); fc.stroke();
+  }
+}
+
+function drawNeedle(x, y, angle, crossed) {
+  const dark = isDark();
+  const dx = Math.cos(angle) * L_HALF;
+  const dy = Math.sin(angle) * L_HALF;
+  fc.beginPath();
+  fc.moveTo(x - dx, y - dy);
+  fc.lineTo(x + dx, y + dy);
+  fc.strokeStyle = crossed
+    ? (dark ? 'rgba(93,202,165,0.85)' : 'rgba(15,110,86,0.8)')
+    : (dark ? 'rgba(240,149,123,0.7)' : 'rgba(216,90,48,0.65)');
+  fc.lineWidth = 1.5;
+  fc.stroke();
+}
+
+function drawConv() {
+  const dark = isDark();
+  cc.clearRect(0, 0, W, H);
+  cc.fillStyle = dark ? '#1e1e1e' : '#f5f5f5';
+  cc.fillRect(0, 0, W, H);
+
+  const pad = 24;
+  const iw = W - pad*2, ih = H - pad*2;
+
+  cc.strokeStyle = dark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.08)';
+  cc.lineWidth = 0.5;
+  [2.5, 3.0, Math.PI, 3.5, 4.0, 4.5].forEach(v => {
+    const yy = pad + ih - ((v - 2.5) / 2) * ih;
+    cc.beginPath(); cc.moveTo(pad, yy); cc.lineTo(pad+iw, yy); cc.stroke();
+  });
+
+  const piY = pad + ih - ((Math.PI - 2.5) / 2) * ih;
+  cc.setLineDash([4,3]);
+  cc.strokeStyle = dark ? 'rgba(55,138,221,0.7)' : 'rgba(24,95,165,0.6)';
+  cc.lineWidth = 1;
+  cc.beginPath(); cc.moveTo(pad, piY); cc.lineTo(pad+iw, piY); cc.stroke();
+  cc.setLineDash([]);
+
+  cc.fillStyle = dark ? 'rgba(55,138,221,0.9)' : 'rgba(24,95,165,0.8)';
+  cc.font = '10px sans-serif';
+  cc.fillText('π', pad+iw+3, piY+4);
+
+  if (history.length > 1) {
+    cc.strokeStyle = dark ? '#5DCAA5' : '#0F6E56';
+    cc.lineWidth = 1.5;
+    cc.beginPath();
+    history.forEach((v, i) => {
+      const x = pad + (i / (history.length - 1)) * iw;
+      const y = pad + ih - ((Math.min(Math.max(v, 2.5), 4.5) - 2.5) / 2) * ih;
+      i === 0 ? cc.moveTo(x, y) : cc.lineTo(x, y);
+    });
+    cc.stroke();
+  }
+
+  cc.fillStyle = dark ? 'rgba(255,255,255,0.3)' : 'rgba(0,0,0,0.25)';
+  cc.font = '10px sans-serif';
+  cc.fillText('2.5', pad - 20, pad + ih + 3);
+  cc.fillText('4.5', pad - 20, pad + 4);
+}
+
+function step() {
+  const n = speedPoints[document.getElementById('speed').value - 1];
+  for (let i = 0; i < n; i++) {
+    const x = Math.random() * W;
+    const y = Math.random() * H;
+    const angle = Math.random() * Math.PI;
+
+    // Extremos reales de la aguja
+    const dy = Math.sin(angle) * L_HALF;
+    const y1 = y - dy, y2 = y + dy;
+    const crossed = Math.floor(y1 / D) !== Math.floor(y2 / D);
+
+    if (crossed) crosses++;
+    total++;
+    if (total <= 3000) drawNeedle(x, y, angle, crossed);
+  }
+
+  // Fórmula correcta: π = 2 * L_TOTAL * N / (D * cruces)
+  const pi_est = crosses > 0 ? (2 * L_TOTAL * total) / (D * crosses) : 0;
+  history.push(pi_est);
+  if (history.length > MAX_HIST) history.shift();
+
+  document.getElementById('pi-val').textContent = pi_est.toFixed(5);
+  document.getElementById('cross-val').textContent = crosses.toLocaleString();
+  document.getElementById('total-val').textContent = total.toLocaleString();
+
+  drawConv();
+  if (running) animId = requestAnimationFrame(step);
+}
+
+function toggleSim() {
+  running = !running;
+  const btn = document.getElementById('btn-play');
+  if (running) {
+    btn.innerHTML = '<i class="ti ti-player-pause" aria-hidden="true"></i> Pausar';
+    step();
+  } else {
+    btn.innerHTML = '<i class="ti ti-player-play" aria-hidden="true"></i> Continuar';
+    if (animId) cancelAnimationFrame(animId);
+  }
+}
+
+function resetSim() {
+  running = false;
+  if (animId) cancelAnimationFrame(animId);
+  crosses = 0; total = 0; history = [];
+  document.getElementById('btn-play').innerHTML = '<i class="ti ti-player-play" aria-hidden="true"></i> Iniciar';
+  document.getElementById('pi-val').textContent = '–';
+  document.getElementById('cross-val').textContent = '0';
+  document.getElementById('total-val').textContent = '0';
+  drawFloorBg();
+  drawConv();
+}
+
+drawFloorBg();
+drawConv();
+</script>
