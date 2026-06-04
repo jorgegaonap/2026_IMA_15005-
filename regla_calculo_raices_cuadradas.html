@@ -1,0 +1,128 @@
+
+<h2 class="sr-only">Regla de cálculo para raíces cuadradas, solo visual</h2>
+<style>
+  .rw { padding: 2rem 0; user-select: none; }
+  .rule-body { background: #e8ddb5; border-radius: 4px; border: 1px solid #b8a870; padding: 10px 0 6px; cursor: ew-resize; }
+  .dark .rule-body, @media(prefers-color-scheme:dark) { background: #3a3220; border-color: #5a4e30; }
+</style>
+
+<div class="rw">
+  <svg id="rs" width="100%" viewBox="0 0 660 180" style="display:block;cursor:ew-resize;" role="img" aria-label="Regla de cálculo con escala A y escala D">
+
+    <rect x="20" y="10" width="620" height="160" rx="6" fill="#e8ddb5" stroke="#b8a870" stroke-width="1"/>
+    <rect x="20" y="10" width="620" height="78" rx="0" fill="#ddd3a0" stroke="none"/>
+    <line x1="20" y1="88" x2="640" y2="88" stroke="#b8a870" stroke-width="1"/>
+
+    <text x="28" y="30" font-size="11" font-weight="500" fill="#8a6030" font-family="serif">A</text>
+    <text x="28" y="160" font-size="11" font-weight="500" fill="#2a5080" font-family="serif">D</text>
+
+    <g id="sA"></g>
+    <g id="sD"></g>
+
+    <line id="cl" x1="350" y1="8" x2="350" y2="172" stroke="#cc2200" stroke-width="1.2"/>
+    <rect id="ch" x="344" y="5" width="12" height="7" rx="2" fill="#cc2200"/>
+
+    <circle id="dA" cx="350" cy="50" r="3.5" fill="#cc4400" stroke="#e8ddb5" stroke-width="1.2"/>
+    <circle id="dD" cx="350" cy="140" r="3.5" fill="#cc4400" stroke="#e8ddb5" stroke-width="1.2"/>
+  </svg>
+</div>
+
+<script>
+const L = 560, X0 = 50;
+
+function xA(n) { return X0 + (Math.log10(n) / 2) * L; }
+function xD(n) { return X0 + Math.log10(n) * L; }
+function nFromXA(x) { return Math.pow(10, 2 * Math.max(0, Math.min(1, (x - X0) / L))); }
+
+function buildA() {
+  const g = document.getElementById('sA');
+  let h = '';
+  const ticks = [
+    {v:1,h:55,label:true}, {v:1.5,h:30}, {v:2,h:55,label:true}, {v:2.5,h:30},
+    {v:3,h:55,label:true}, {v:3.5,h:30}, {v:4,h:55,label:true}, {v:4.5,h:30},
+    {v:5,h:55,label:true}, {v:5.5,h:30}, {v:6,h:55,label:true}, {v:6.5,h:30},
+    {v:7,h:55,label:true}, {v:7.5,h:30}, {v:8,h:55,label:true}, {v:8.5,h:30},
+    {v:9,h:55,label:true}, {v:9.5,h:30},
+    {v:10,h:65,label:true,big:true},
+    {v:15,h:30},{v:20,h:55,label:true},{v:25,h:30},{v:30,h:55,label:true},
+    {v:35,h:30},{v:40,h:55,label:true},{v:45,h:30},{v:50,h:55,label:true},
+    {v:55,h:30},{v:60,h:55,label:true},{v:65,h:30},{v:70,h:55,label:true},
+    {v:75,h:30},{v:80,h:55,label:true},{v:85,h:30},{v:90,h:55,label:true},
+    {v:95,h:30},{v:100,h:65,label:true,big:true},
+  ];
+  for (let i=1; i<10; i++) for (let d=1; d<=9; d++) {
+    const v = i + d*0.1;
+    if (!ticks.find(t=>Math.abs(t.v-v)<0.01)) ticks.push({v,h:18});
+  }
+  for (let i=10; i<100; i+=5) {
+    const v = i + 2.5;
+    if (!ticks.find(t=>Math.abs(t.v-v)<0.01)) ticks.push({v,h:18});
+  }
+  ticks.forEach(({v,h:th,label,big}) => {
+    const x = xA(v).toFixed(2);
+    const y1 = 88 - th;
+    h += `<line x1="${x}" y1="${y1}" x2="${x}" y2="88" stroke="#7a6020" stroke-width="${big?1:0.6}"/>`;
+    if (label) {
+      const fs = big ? 10 : 8.5;
+      const y = y1 - 3;
+      h += `<text x="${x}" y="${y}" text-anchor="middle" font-size="${fs}" fill="#5a4010" font-family="serif">${v}</text>`;
+    }
+  });
+  g.innerHTML = h;
+}
+
+function buildD() {
+  const g = document.getElementById('sD');
+  let h = '';
+  const ticks = [
+    {v:1,h:55,label:true,big:true},{v:1.5,h:30},{v:2,h:55,label:true},{v:2.5,h:30},
+    {v:3,h:55,label:true},{v:3.5,h:30},{v:4,h:55,label:true},{v:4.5,h:30},
+    {v:5,h:55,label:true},{v:5.5,h:30},{v:6,h:55,label:true},{v:6.5,h:30},
+    {v:7,h:55,label:true},{v:7.5,h:30},{v:8,h:55,label:true},{v:8.5,h:30},
+    {v:9,h:55,label:true},{v:9.5,h:30},{v:10,h:65,label:true,big:true},
+  ];
+  for (let i=1; i<10; i++) for (let d=1; d<=9; d++) {
+    const v = i + d*0.1;
+    if (!ticks.find(t=>Math.abs(t.v-v)<0.01)) ticks.push({v,h:18});
+  }
+  ticks.forEach(({v,h:th,label,big}) => {
+    const x = xD(v).toFixed(2);
+    const y2 = 92 + th;
+    h += `<line x1="${x}" y1="92" x2="${x}" y2="${y2}" stroke="#204060" stroke-width="${big?1:0.6}"/>`;
+    if (label) {
+      const fs = big ? 10 : 8.5;
+      const y = y2 + 10;
+      h += `<text x="${x}" y="${y}" text-anchor="middle" font-size="${fs}" fill="#1a3050" font-family="serif">${v}</text>`;
+    }
+  });
+  g.innerHTML = h;
+}
+
+function update(n) {
+  n = Math.max(1.01, Math.min(99.9, n));
+  const sq = Math.sqrt(n);
+  const xa = xA(n), xd = xD(sq);
+  const cx = ((xa + xd) / 2).toFixed(2);
+  document.getElementById('cl').setAttribute('x1', cx);
+  document.getElementById('cl').setAttribute('x2', cx);
+  document.getElementById('ch').setAttribute('x', (parseFloat(cx)-6).toFixed(2));
+  document.getElementById('dA').setAttribute('cx', xa.toFixed(2));
+  document.getElementById('dD').setAttribute('cx', xd.toFixed(2));
+}
+
+buildA(); buildD(); update(25);
+
+const svg = document.getElementById('rs');
+let drag = false;
+function getN(cx) {
+  const r = svg.getBoundingClientRect();
+  const sx = (cx - r.left) * (660 / r.width);
+  return nFromXA(sx);
+}
+svg.addEventListener('mousedown', e => { drag=true; update(getN(e.clientX)); });
+window.addEventListener('mousemove', e => { if(drag) update(getN(e.clientX)); });
+window.addEventListener('mouseup', () => drag=false);
+svg.addEventListener('touchstart', e => { drag=true; update(getN(e.touches[0].clientX)); e.preventDefault(); }, {passive:false});
+window.addEventListener('touchmove', e => { if(drag) update(getN(e.touches[0].clientX)); });
+window.addEventListener('touchend', () => drag=false);
+</script>
