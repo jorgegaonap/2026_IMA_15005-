@@ -1,0 +1,196 @@
+
+<style>
+  .controls { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; margin-bottom: 1.5rem; }
+  .stat-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-bottom: 1.5rem; }
+  .stat { background: var(--color-background-secondary); border-radius: var(--border-radius-md); padding: 0.75rem 1rem; }
+  .stat-label { font-size: 12px; color: var(--color-text-secondary); margin-bottom: 4px; }
+  .stat-value { font-size: 20px; font-weight: 500; color: var(--color-text-primary); font-variant-numeric: tabular-nums; }
+  .stat-value.highlight { color: #185FA5; }
+  .btn { padding: 7px 16px; border-radius: var(--border-radius-md); border: 0.5px solid var(--color-border-secondary); background: var(--color-background-primary); color: var(--color-text-primary); cursor: pointer; font-size: 14px; }
+  .btn:hover { background: var(--color-background-secondary); }
+  .btn.primary { background: #185FA5; color: #E6F1FB; border-color: #185FA5; }
+  .btn.primary:hover { background: #0C447C; }
+  .btn.danger { background: var(--color-background-danger); color: var(--color-text-danger); border-color: var(--color-border-danger); }
+  .canvases { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  .canvas-wrap { background: var(--color-background-secondary); border-radius: var(--border-radius-md); padding: 8px; }
+  .canvas-title { font-size: 12px; color: var(--color-text-secondary); margin-bottom: 6px; padding-left: 4px; }
+  @media (max-width: 520px) { .canvases { grid-template-columns: 1fr; } .stat-grid { grid-template-columns: repeat(2, 1fr); } }
+</style>
+
+<h2 class="sr-only">Simulación de Monte Carlo para estimar π</h2>
+
+<div class="stat-grid">
+  <div class="stat"><div class="stat-label">Estimación de π</div><div class="stat-value highlight" id="pi-est">–</div></div>
+  <div class="stat"><div class="stat-label">Puntos dentro</div><div class="stat-value" id="pts-in">0</div></div>
+  <div class="stat"><div class="stat-label">Total de puntos</div><div class="stat-value" id="pts-total">0</div></div>
+</div>
+
+<div class="controls">
+  <button class="btn primary" id="btn-start" onclick="toggleSim()"><i class="ti ti-player-play" aria-hidden="true"></i> Iniciar</button>
+  <button class="btn danger" onclick="resetSim()"><i class="ti ti-refresh" aria-hidden="true"></i> Reiniciar</button>
+  <div style="display:flex;align-items:center;gap:8px;font-size:13px;color:var(--color-text-secondary)">
+    <span>Velocidad</span>
+    <input type="range" id="speed" min="1" max="5" value="3" step="1" style="width:90px">
+    <span id="speed-label">media</span>
+  </div>
+</div>
+
+<div class="canvases">
+  <div class="canvas-wrap">
+    <div class="canvas-title">puntos aleatorios</div>
+    <canvas id="scatter" width="280" height="280" style="width:100%;height:auto;display:block;" role="img" aria-label="Dispersión de puntos dentro y fuera del círculo unitario"></canvas>
+  </div>
+  <div class="canvas-wrap">
+    <div class="canvas-title">convergencia hacia π</div>
+    <canvas id="convergence" width="280" height="280" style="width:100%;height:auto;display:block;" role="img" aria-label="Gráfico de convergencia de la estimación de pi"></canvas>
+  </div>
+</div>
+
+<script>
+const scatterCanvas = document.getElementById('scatter');
+const convCanvas = document.getElementById('convergence');
+const sc = scatterCanvas.getContext('2d');
+const cc = convCanvas.getContext('2d');
+
+let inside = 0, total = 0, running = false, animId = null;
+let history = [];
+const MAX_HIST = 300;
+
+const speedLabels = ['muy lenta','lenta','media','rápida','muy rápida'];
+const speedPoints = [2,8,20,60,150];
+
+document.getElementById('speed').addEventListener('input', e => {
+  document.getElementById('speed-label').textContent = speedLabels[e.target.value - 1];
+});
+
+function isDark() { return matchMedia('(prefers-color-scheme: dark)').matches; }
+
+function drawScatter() {
+  const w = scatterCanvas.width, h = scatterCanvas.height;
+  const dark = isDark();
+  sc.clearRect(0, 0, w, h);
+  sc.fillStyle = dark ? '#1a1a1a' : '#f5f5f5';
+  sc.fillRect(0, 0, w, h);
+
+  sc.beginPath();
+  sc.arc(w/2, h/2, w/2, 0, Math.PI*2);
+  sc.strokeStyle = dark ? 'rgba(55,138,221,0.6)' : 'rgba(24,95,165,0.5)';
+  sc.lineWidth = 1.5;
+  sc.stroke();
+
+  sc.strokeStyle = dark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.1)';
+  sc.lineWidth = 0.5;
+  sc.strokeRect(0, 0, w, h);
+}
+
+function addPoint(x, y, isInside) {
+  const w = scatterCanvas.width, h = scatterCanvas.height;
+  const px = x * w, py = y * h;
+  sc.beginPath();
+  sc.arc(px, py, 2, 0, Math.PI*2);
+  sc.fillStyle = isInside
+    ? (isDark() ? 'rgba(93,202,165,0.75)' : 'rgba(15,110,86,0.65)')
+    : (isDark() ? 'rgba(240,149,123,0.65)' : 'rgba(216,90,48,0.6)');
+  sc.fill();
+}
+
+function drawConvergence() {
+  const w = convCanvas.width, h = convCanvas.height;
+  const dark = isDark();
+  cc.clearRect(0, 0, w, h);
+  cc.fillStyle = dark ? '#1a1a1a' : '#f5f5f5';
+  cc.fillRect(0, 0, w, h);
+
+  const pad = 24;
+  const iw = w - pad*2, ih = h - pad*2;
+
+  cc.strokeStyle = dark ? 'rgba(255,255,255,0.12)' : 'rgba(0,0,0,0.1)';
+  cc.lineWidth = 0.5;
+  [3.0, 3.5, Math.PI, 3.5].forEach(v => {
+    const yy = pad + ih - ((v - 2.5) / 2) * ih;
+    cc.beginPath(); cc.moveTo(pad, yy); cc.lineTo(pad+iw, yy); cc.stroke();
+  });
+
+  cc.strokeStyle = dark ? 'rgba(55,138,221,0.8)' : 'rgba(24,95,165,0.7)';
+  cc.lineWidth = 1;
+  cc.setLineDash([4,3]);
+  const piY = pad + ih - ((Math.PI - 2.5) / 2) * ih;
+  cc.beginPath(); cc.moveTo(pad, piY); cc.lineTo(pad+iw, piY); cc.stroke();
+  cc.setLineDash([]);
+
+  cc.fillStyle = dark ? 'rgba(55,138,221,0.9)' : 'rgba(24,95,165,0.8)';
+  cc.font = '10px sans-serif';
+  cc.fillText('π', pad+iw+3, piY+4);
+
+  if (history.length > 1) {
+    cc.strokeStyle = dark ? '#5DCAA5' : '#0F6E56';
+    cc.lineWidth = 1.5;
+    cc.beginPath();
+    history.forEach((v, i) => {
+      const x = pad + (i / (history.length-1)) * iw;
+      const y = pad + ih - ((v - 2.5) / 2) * ih;
+      i === 0 ? cc.moveTo(x, y) : cc.lineTo(x, y);
+    });
+    cc.stroke();
+  }
+
+  cc.fillStyle = dark ? 'rgba(255,255,255,0.3)' : 'rgba(0,0,0,0.25)';
+  cc.font = '10px sans-serif';
+  cc.fillText('2.5', pad-18, pad+ih+1);
+  cc.fillText('4.5', pad-18, pad+3);
+}
+
+function step() {
+  const n = speedPoints[document.getElementById('speed').value - 1];
+  for (let i = 0; i < n; i++) {
+    const x = Math.random(), y = Math.random();
+    const dx = x - 0.5, dy = y - 0.5;
+    const isIn = dx*dx + dy*dy <= 0.25;
+    if (isIn) inside++;
+    total++;
+    if (total <= 5000) addPoint(x, y, isIn);
+  }
+
+  const est = total > 0 ? 4 * inside / total : 0;
+
+  history.push(est);
+  if (history.length > MAX_HIST) history.shift();
+
+  document.getElementById('pi-est').textContent = est.toFixed(5);
+  document.getElementById('pts-in').textContent = inside.toLocaleString();
+  document.getElementById('pts-total').textContent = total.toLocaleString();
+
+  drawConvergence();
+
+  if (running) animId = requestAnimationFrame(step);
+}
+
+function toggleSim() {
+  running = !running;
+  const btn = document.getElementById('btn-start');
+  if (running) {
+    btn.innerHTML = '<i class="ti ti-player-pause" aria-hidden="true"></i> Pausar';
+    btn.classList.add('primary');
+    step();
+  } else {
+    btn.innerHTML = '<i class="ti ti-player-play" aria-hidden="true"></i> Continuar';
+    if (animId) cancelAnimationFrame(animId);
+  }
+}
+
+function resetSim() {
+  running = false;
+  if (animId) cancelAnimationFrame(animId);
+  inside = 0; total = 0; history = [];
+  document.getElementById('btn-start').innerHTML = '<i class="ti ti-player-play" aria-hidden="true"></i> Iniciar';
+  document.getElementById('btn-start').classList.add('primary');
+  document.getElementById('pi-est').textContent = '–';
+  document.getElementById('pts-in').textContent = '0';
+  document.getElementById('pts-total').textContent = '0';
+  drawScatter();
+  drawConvergence();
+}
+
+drawScatter();
+drawConvergence();
+</script>
