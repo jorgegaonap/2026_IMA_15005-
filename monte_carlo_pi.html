@@ -148,7 +148,7 @@ function step() {
     const isIn = dx*dx + dy*dy <= 0.25;
     if (isIn) inside++;
     total++;
-    if (total <= 5000) addPoint(x, y, isIn);
+    if (total <= 500000) addPoint(x, y, isIn);
   }
 
   const est = total > 0 ? 4 * inside / total : 0;
